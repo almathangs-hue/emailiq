@@ -291,6 +291,184 @@ npm install
 npm run dev
 ```
 
+## Developer Tools
+
+### Docker
+
+Docker packages the app and all its dependencies into isolated **containers** — lightweight, self-contained environments that run the same way on any machine. You don't need to install Python, PostgreSQL, or Node separately. Docker handles it all.
+
+#### How docker-compose works in this project
+
+`docker-compose.yml` defines three services that start together with one command:
+
+```
+docker-compose up
+```
+
+```mermaid
+flowchart LR
+    subgraph Docker Network
+        DB["db\nPostgreSQL 16\nport 5432"]
+        BE["backend\nFastAPI + Uvicorn\nport 8000"]
+        FE["frontend\nNode + Vite\nport 5173"]
+    end
+
+    BE -->|DATABASE_URL| DB
+    FE -->|VITE_API_URL| BE
+    You -->|localhost:5173| FE
+    You -->|localhost:8000/api/docs| BE
+```
+
+#### What each service does
+
+| Service | Image | What it runs | Port |
+|---|---|---|---|
+| `db` | `postgres:16-alpine` | PostgreSQL database | 5432 |
+| `backend` | Built from `./backend/Dockerfile` | FastAPI app via Uvicorn | 8000 |
+| `frontend` | `node:20-alpine` | Vite dev server | 5173 |
+
+#### Key Docker features used
+
+**Health check — backend waits for the database to be ready**
+
+```yaml
+depends_on:
+  db:
+    condition: service_healthy
+```
+
+Without this, FastAPI would start before PostgreSQL is ready and crash immediately. The health check runs `pg_isready` every 5 seconds until the database accepts connections, then starts the backend.
+
+**Volume mounts — live code reloading without rebuilding**
+
+```yaml
+volumes:
+  - ./backend:/app
+```
+
+Your local `backend/` folder is mounted directly into the container. When you edit a Python file, Uvicorn detects the change and reloads automatically — no need to restart Docker. Same for the frontend with Vite.
+
+**Named volume — PostgreSQL data persists between restarts**
+
+```yaml
+volumes:
+  postgres_data:
+```
+
+Without this, every `docker-compose down` would wipe your database. The named volume keeps data on disk between restarts. To fully reset the database: `docker-compose down -v`.
+
+**Shared network — services find each other by name**
+
+Inside Docker, services don't use `localhost` to talk to each other — they use the service name. That's why `DATABASE_URL` is:
+
+```
+postgresql://emailiq:emailiq@db:5432/emailiq
+#                             ^^ service name, not localhost
+```
+
+#### Useful commands
+
+```bash
+docker-compose up --build    # start everything, rebuild images first
+docker-compose up            # start without rebuilding
+docker-compose down          # stop all services
+docker-compose down -v       # stop and delete the database volume (full reset)
+docker-compose logs backend  # see logs for one service
+docker-compose ps            # see which services are running
+```
+
+> **Reference:** [Docker Compose documentation](https://docs.docker.com/compose/) · [Dockerfile reference](https://docs.docker.com/engine/reference/builder/)
+
+---
+
+### Vite
+
+Vite is the build tool and dev server for the React frontend. Browsers can't run TypeScript or understand `import` statements natively — Vite bridges that gap.
+
+#### What Vite does in this project
+
+**1. Runs the development server**
+
+```bash
+npm run dev   # starts Vite at http://localhost:5173
+```
+
+Vite serves your React app to the browser. Unlike older tools, it serves files on demand using native ES modules — so startup is near-instant regardless of project size.
+
+**2. Compiles TypeScript → JavaScript**
+
+Browsers only understand JavaScript. When you write:
+
+```tsx
+// src/components/common/Button.tsx
+export default function Button({ children }: { children: React.ReactNode }) {
+  return <button>{children}</button>
+}
+```
+
+Vite strips the TypeScript types and converts JSX to plain JavaScript before sending it to the browser. None of that `.tsx` syntax reaches the browser directly.
+
+**3. Hot Module Replacement (HMR)**
+
+When you edit any file, Vite pushes only the changed module to the browser — the page updates in milliseconds without a full reload, and without losing your app's current state (e.g. which page you're on, what's in a form).
+
+**4. Path aliases — `@/` instead of `../../`**
+
+Without aliases, deeply nested imports look like:
+
+```ts
+import Button from "../../../components/common/Button"  // fragile, hard to read
+```
+
+We configured `@/` to map to `src/`, so every import is clean and absolute:
+
+```ts
+import Button from "@/components/common/Button"  // always works, no matter where the file is
+```
+
+This is set up in two places — `vite.config.ts` (for Vite) and `tsconfig.json` (for TypeScript):
+
+```ts
+// vite.config.ts
+resolve: {
+  alias: { "@": path.resolve(__dirname, "./src") }
+}
+```
+
+**5. Environment variables**
+
+Any variable in `.env` prefixed with `VITE_` is injected into the frontend bundle at build time:
+
+```ts
+// .env
+VITE_API_URL=http://localhost:8000
+
+// In your code
+const api = import.meta.env.VITE_API_URL  // "http://localhost:8000"
+```
+
+Variables without the `VITE_` prefix are kept private (backend only). This prevents accidentally exposing secrets like `SECRET_KEY` to the browser.
+
+**6. Production build**
+
+```bash
+npm run build   # outputs to frontend/dist/
+```
+
+Vite bundles, minifies, and tree-shakes everything into static files (`dist/`) — plain HTML, CSS, and JS. These are what get deployed to a CDN or static host like Vercel. The Vite dev server is never used in production.
+
+#### Vite vs Create React App (what you might see in older tutorials)
+
+| | Vite | Create React App |
+|---|---|---|
+| Dev server startup | ~300ms | 10–30 seconds |
+| Hot reload | ~50ms | 1–3 seconds |
+| TypeScript support | Built-in | Needs configuration |
+| Still maintained | Yes | No (deprecated 2023) |
+| Used by | Vue, React, Svelte | React only |
+
+> **Reference:** [Vite documentation](https://vitejs.dev/guide/) · [Why Vite](https://vitejs.dev/guide/why.html)
+
 ## Status
 
 **MVP in progress.** V1 scope:
