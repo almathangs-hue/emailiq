@@ -174,6 +174,84 @@ User
            └── EmailFeedback← confirm / reject per detection
 ```
 
+## Google Authentication
+
+EmailIQ uses **Google OAuth 2.0 (Authorization Code Flow)** to securely connect to a user's Gmail account without ever handling their Google password.
+
+### How the flow works
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant F as React Frontend
+    participant B as FastAPI Backend
+    participant G as Google OAuth
+
+    U->>F: Clicks "Sign in with Google"
+    F->>B: GET /api/v1/auth/login
+    B->>G: Redirect to Google consent screen
+    G->>U: User approves access
+    G->>B: Callback with auth code
+    B->>G: Exchange code for tokens
+    G->>B: access_token + refresh_token
+    B->>B: Encrypt tokens, store in DB
+    B->>B: Issue JWT for session
+    B->>F: Redirect to /dashboard?token=JWT
+    F->>F: Store JWT in Zustand (localStorage)
+    F->>B: All future requests: Authorization: Bearer JWT
+```
+
+### Scope requested
+
+EmailIQ requests the **minimum necessary permissions**:
+
+| Scope | Why |
+|---|---|
+| `openid` | Verify identity with Google |
+| `email` | Know which Gmail account is connected |
+| `profile` | Show user's name and avatar in the UI |
+| `gmail.readonly` | Read inbox to detect job application emails |
+
+`gmail.readonly` is intentionally read-only. EmailIQ **cannot** send, delete, or modify emails. Users can revoke access at any time via [Google Account → Security → Third-party apps](https://myaccount.google.com/permissions).
+
+### Implementation pieces
+
+#### Backend — `app/api/v1/routers/auth.py`
+Registers the Google OAuth client via **Authlib** and exposes two endpoints:
+- `GET /api/v1/auth/login` — builds the Google authorization URL with state parameter (CSRF protection) and redirects the user
+- `GET /api/v1/auth/callback` — receives the authorization code from Google, exchanges it for tokens, upserts the user and account in the database, and issues a JWT
+
+#### Token encryption — `app/core/auth.py`
+Google access and refresh tokens are sensitive credentials. Before storing them in PostgreSQL, they are **encrypted using Fernet symmetric encryption** (`cryptography` library). Raw tokens never touch the database. On each Gmail API call, the token is decrypted in memory, used, then discarded.
+
+```python
+# Tokens are always encrypted before DB write
+account.access_token = encrypt_token(raw_access_token)
+account.refresh_token = encrypt_token(raw_refresh_token)
+```
+
+#### Session management
+After OAuth completes, the backend issues a **short-lived JWT** (1 hour expiry) signed with `SECRET_KEY`. The frontend stores this in Zustand (persisted to localStorage) and attaches it as a `Bearer` token on every API request via an Axios interceptor. On 401, the interceptor clears the token and redirects to login.
+
+#### Token refresh
+Google access tokens expire after 1 hour. The Gmail service (`app/services/gmail_service.py`) automatically detects expiry using `google-auth` and uses the stored refresh token to obtain a new access token, updating the encrypted value in the database transparently.
+
+#### CSRF protection
+Authlib's `SessionMiddleware` stores a `state` parameter in the server-side session during the login redirect. Google echoes it back in the callback. If they don't match, the request is rejected — preventing cross-site request forgery attacks on the OAuth flow.
+
+### Google Cloud setup (one-time)
+
+To run EmailIQ locally or deploy it, you need a Google Cloud project with the Gmail API enabled:
+
+1. Create a project at [console.cloud.google.com](https://console.cloud.google.com)
+2. Enable the **Gmail API** under APIs & Services → Library
+3. Configure the **OAuth consent screen** (External, add `gmail.readonly` scope)
+4. Add your email as a **test user** (required while app is unverified)
+5. Create **OAuth 2.0 credentials** → Web application, add authorized redirect URI:
+   - Local: `http://localhost:8000/api/v1/auth/callback`
+   - Production: `https://your-domain.com/api/v1/auth/callback`
+6. Copy the Client ID and Secret into your `.env` file
+
 ## Live Demo
 
 > Not deployed yet — in progress.
