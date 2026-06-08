@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+﻿from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from authlib.integrations.starlette_client import OAuth
@@ -62,7 +62,7 @@ async def callback(request: Request, db: Session = Depends(get_db)):
     db.commit()
 
     jwt_token = create_access_token(user.id)
-    return RedirectResponse(f"{settings.frontend_url}/dashboard?token={jwt_token}")
+    return RedirectResponse(f"{settings.frontend_url}/auth/callback?token={jwt_token}")
 
 
 @router.get("/me", response_model=UserResponse)
@@ -76,3 +76,5 @@ def me(user_id: str = Depends(get_current_user_id), db: Session = Depends(get_db
 @router.post("/logout", status_code=200)
 def logout():
     return {"message": "Logged out"}
+
+

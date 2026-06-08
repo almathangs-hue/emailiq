@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+﻿import { useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { useApplications } from "@/hooks/useApplications";
 import type { ApplicationFilters } from "@/types";
@@ -9,17 +8,7 @@ import SyncPanel from "@/components/Dashboard/SyncPanel";
 import Button from "@/components/common/Button";
 
 export default function Dashboard() {
-  const [searchParams] = useSearchParams();
-  const { setToken, logout, user } = useAuthStore();
-
-  // Pick up token from OAuth redirect (?token=...)
-  useEffect(() => {
-    const token = searchParams.get("token");
-    if (token) {
-      setToken(token);
-      window.history.replaceState({}, "", "/dashboard");
-    }
-  }, [searchParams, setToken]);
+  const { logout, user } = useAuthStore();
 
   const [filters, setFilters] = useState<ApplicationFilters>({
     page: 1,
@@ -76,7 +65,7 @@ export default function Dashboard() {
 
         {/* Table */}
         {isLoading && (
-          <div className="text-center py-20 text-gray-400">Loading…</div>
+          <div className="text-center py-20 text-gray-400">Loadingâ€¦</div>
         )}
         {isError && (
           <div className="text-center py-20 text-red-500">
@@ -113,3 +102,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
