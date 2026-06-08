@@ -1,8 +1,8 @@
-import uuid
+﻿import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime, Integer, Boolean, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database import Base
+from app.db.base import Base
 
 
 class EmailRecord(Base):
@@ -24,3 +24,4 @@ class EmailRecord(Base):
     account: Mapped["ConnectedAccount"] = relationship(back_populates="email_records")
     application: Mapped["Application | None"] = relationship(back_populates="email_record", uselist=False)
     feedback: Mapped[list["EmailFeedback"]] = relationship(back_populates="email_record", cascade="all, delete-orphan")
+

@@ -1,11 +1,9 @@
-from datetime import datetime, timedelta
+﻿from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from cryptography.fernet import Fernet
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
 from app.core.config import settings
-from app.database import get_db
 
 bearer_scheme = HTTPBearer()
 
@@ -36,7 +34,7 @@ def get_current_user_id(
 
 # --- Token encryption for DB storage ---
 # Fernet key must be 32 url-safe base64-encoded bytes.
-# Derived from SECRET_KEY — in production use a dedicated ENCRYPTION_KEY env var.
+# Derived from SECRET_KEY â€” in production use a dedicated ENCRYPTION_KEY env var.
 def _get_fernet() -> Fernet:
     import base64
     key = base64.urlsafe_b64encode(settings.secret_key.encode()[:32].ljust(32, b"0"))
@@ -49,3 +47,4 @@ def encrypt_token(token: str) -> str:
 
 def decrypt_token(encrypted: str) -> str:
     return _get_fernet().decrypt(encrypted.encode()).decode()
+

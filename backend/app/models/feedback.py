@@ -1,8 +1,8 @@
-import uuid
+﻿import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime, Integer, ForeignKey, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database import Base
+from app.db.base import Base
 import enum
 
 
@@ -23,3 +23,4 @@ class EmailFeedback(Base):
 
     email_record: Mapped["EmailRecord"] = relationship(back_populates="feedback")
     user: Mapped["User"] = relationship(back_populates="feedback")
+

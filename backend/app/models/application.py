@@ -1,8 +1,8 @@
-import uuid
+﻿import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime, Boolean, ForeignKey, Text, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database import Base
+from app.db.base import Base
 import enum
 
 
@@ -34,3 +34,4 @@ class Application(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     email_record: Mapped["EmailRecord"] = relationship(back_populates="application")
+

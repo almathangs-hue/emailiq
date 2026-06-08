@@ -1,8 +1,8 @@
-import uuid
+﻿import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database import Base
+from app.db.base import Base
 
 
 class User(Base):
@@ -16,3 +16,4 @@ class User(Base):
 
     accounts: Mapped[list["ConnectedAccount"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     feedback: Mapped[list["EmailFeedback"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
